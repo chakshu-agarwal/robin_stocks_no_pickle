@@ -52,9 +52,9 @@ def respond_to_challenge(challenge_id, sms_code):
 
 def login(username=None, password=None, expiresIn=86400, scope='internal', by_sms=True, store_session=True, mfa_code=None, pickle_name=""):
     """This function will effectively log the user into robinhood by getting an
-    authentication token and saving it to the session header. By default, it
+    authentication token and saving it to the session header. IF store_session = True, it
     will store the authentication token in a pickle file and load that value
-    on subsequent logins.
+    on subsequent logins
 
     :param username: The username for your robinhood account, usually your email.
         Not required if credentials are already cached and valid.
@@ -79,13 +79,7 @@ def login(username=None, password=None, expiresIn=86400, scope='internal', by_sm
     contains information on whether the access token was generated or loaded from pickle file.
 
     """
-    device_token = generate_device_token()
-    home_dir = os.path.expanduser("~")
-    data_dir = os.path.join(home_dir, ".tokens")
-    if not os.path.exists(data_dir):
-        os.makedirs(data_dir)
-    creds_file = "robinhood" + pickle_name + ".pickle"
-    pickle_path = os.path.join(data_dir, creds_file)
+    
     # Challenge type is used if not logging in with two-factor authentication.
     if by_sms:
         challenge_type = "sms"
@@ -107,39 +101,48 @@ def login(username=None, password=None, expiresIn=86400, scope='internal', by_sm
     if mfa_code:
         payload['mfa_code'] = mfa_code
 
-    # If authentication has been stored in pickle file then load it. Stops login server from being pinged so much.
-    if os.path.isfile(pickle_path):
-        # If store_session has been set to false then delete the pickle file, otherwise try to load it.
+    # If session_store set to True, then define pickle_path
+    if store_session:
+      device_token = generate_device_token()
+      home_dir = os.path.expanduser("~")
+      data_dir = os.path.join(home_dir, ".tokens")
+      if not os.path.exists(data_dir):
+          os.makedirs(data_dir)
+      creds_file = "robinhood" + pickle_name + ".pickle"
+      pickle_path = os.path.join(data_dir, creds_file)
+
+      # If authentication has been stored in pickle file then load it. Stops login server from being pinged so much.
+      if os.path.isfile(pickle_path):
+        # If pickle file exists, try to load it.
         # Loading pickle file will fail if the acess_token has expired.
-        if store_session:
-            try:
-                with open(pickle_path, 'rb') as f:
-                    pickle_data = pickle.load(f)
-                    access_token = pickle_data['access_token']
-                    token_type = pickle_data['token_type']
-                    refresh_token = pickle_data['refresh_token']
-                    # Set device_token to be the original device token when first logged in.
-                    pickle_device_token = pickle_data['device_token']
-                    payload['device_token'] = pickle_device_token
-                    # Set login status to True in order to try and get account info.
-                    set_login_state(True)
-                    update_session(
-                        'Authorization', '{0} {1}'.format(token_type, access_token))
-                    # Try to load account profile to check that authorization token is still valid.
-                    res = request_get(
-                        positions_url(), 'pagination', {'nonzero': 'true'}, jsonify_data=False)
-                    # Raises exception is response code is not 200.
-                    res.raise_for_status()
-                    return({'access_token': access_token, 'token_type': token_type,
-                            'expires_in': expiresIn, 'scope': scope, 'detail': 'logged in using authentication in {0}'.format(creds_file),
-                            'backup_code': None, 'refresh_token': refresh_token})
-            except:
-                print(
-                    "ERROR: There was an issue loading pickle file. Authentication may be expired - logging in normally.", file=get_output())
-                set_login_state(False)
-                update_session('Authorization', None)
-        else:
-            os.remove(pickle_path)
+        try:
+            with open(pickle_path, 'rb') as f:
+                pickle_data = pickle.load(f)
+                access_token = pickle_data['access_token']
+                token_type = pickle_data['token_type']
+                refresh_token = pickle_data['refresh_token']
+                # Set device_token to be the original device token when first logged in.
+                pickle_device_token = pickle_data['device_token']
+                payload['device_token'] = pickle_device_token
+                # Set login status to True in order to try and get account info.
+                set_login_state(True)
+                update_session(
+                    'Authorization', '{0} {1}'.format(token_type, access_token))
+                # Try to load account profile to check that authorization token is still valid.
+                res = request_get(
+                    positions_url(), 'pagination', {'nonzero': 'true'}, jsonify_data=False)
+                # Raises exception is response code is not 200.
+                res.raise_for_status()
+                return({'access_token': access_token, 'token_type': token_type,
+                        'expires_in': expiresIn, 'scope': scope, 'detail': 'logged in using authentication in {0}'.format(creds_file),
+                        'backup_code': None, 'refresh_token': refresh_token})
+        except:
+            print(
+                "ERROR: There was an issue loading pickle file. Authentication may be expired - logging in normally.", file=get_output())
+            set_login_state(False)
+            update_session('Authorization', None)
+      else:
+         pass
 
     # Try to log in normally.
     if not username:
@@ -191,6 +194,7 @@ def login(username=None, password=None, expiresIn=86400, scope='internal', by_sm
     else:
         raise Exception('Error: Trouble connecting to robinhood API. Check internet connection.')
     return(data)
+
 
 
 @login_required
