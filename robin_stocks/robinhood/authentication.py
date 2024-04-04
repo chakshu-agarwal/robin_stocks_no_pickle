@@ -79,6 +79,7 @@ def login(username=None, password=None, expiresIn=86400, scope='internal', by_sm
     contains information on whether the access token was generated or loaded from pickle file.
 
     """
+    device_token = generate_device_token()
     
     # Challenge type is used if not logging in with two-factor authentication.
     if by_sms:
@@ -103,7 +104,6 @@ def login(username=None, password=None, expiresIn=86400, scope='internal', by_sm
 
     # If session_store set to True, then define pickle_path
     if store_session:
-      device_token = generate_device_token()
       home_dir = os.path.expanduser("~")
       data_dir = os.path.join(home_dir, ".tokens")
       if not os.path.exists(data_dir):
